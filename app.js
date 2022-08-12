@@ -1,48 +1,53 @@
 'use strict';
 
-// load modules
+// Load modules
 const express = require('express');
 const morgan = require('morgan');
+const routes = require('./routes/routes');
+const { sequelize } = require('./models')
 
-// variable to enable global error logging
-const enableGlobalErrorLogging = process.env.ENABLE_GLOBAL_ERROR_LOGGING === 'true';
-
-// create the Express app
+// Create the Express app
 const app = express();
 
-// setup morgan which gives us http request logging
-app.use(morgan('dev'));
-
-// setup a friendly greeting for the root route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Welcome to the REST API project!',
-  });
-});
-
-// send 404 if no other route matched
-app.use((req, res) => {
-  res.status(404).json({
-    message: 'Route Not Found',
-  });
-});
-
-// setup a global error handler
-app.use((err, req, res, next) => {
-  if (enableGlobalErrorLogging) {
-    console.error(`Global error handler: ${JSON.stringify(err.stack)}`);
+// Tests the database connection
+(async () => {
+  await sequelize.sync();
+  try {
+    await sequelize.authenticate();
+    console.log('Connection to the database successful!');
+  } catch (error) {
+    console.error('Error connecting to the database:', error);
   }
+})();
 
-  res.status(err.status || 500).json({
-    message: err.message,
-    error: {},
-  });
+// Configures middleware
+app.use(express.json());
+app.use(morgan('dev'));
+app.use("/api", routes);
+
+// Root route greeting
+app.get('/', (req, res) => {
+  res.json('Welcome to the REST API project!');
 });
 
-// set our port
+// 404 error handling
+app.use((req, res) => {
+  res.status(404);
+  res.json({ error: 'Route not found' });
+});
+
+// Global error handling
+app.use((err, req, res, next) => {
+  console.error(`Global error handler: ${JSON.stringify(err.stack)}`);
+
+  res.status(err.status || 500);
+  res.json({ error: err.message });
+});
+
+// Port
 app.set('port', process.env.PORT || 5000);
 
-// start listening on our port
+// Start the server
 const server = app.listen(app.get('port'), () => {
   console.log(`Express server is listening on port ${server.address().port}`);
 });
